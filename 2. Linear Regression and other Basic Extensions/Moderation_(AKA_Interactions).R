@@ -49,9 +49,6 @@ Y <- .7*X + .3*Z + 2.5*X*Z + rnorm(n, sd = 5)
 
 dat <- data.frame(DV=Y, IV=X, Mod=Z)
 
-#dat <- read.csv("data.csv", header=T)
-#dat <- readxl::read_xlsx("fake.data.xlsx")
-
 #===========================================
 # Assess Descriptives                      #
 #==========================================-
@@ -137,6 +134,7 @@ theme_set(
 #====================== =
 # First - pick values by hand
 # Going to just pick values of mod and dv
+
 
 Inter.effects.hand <- effect('IV.C*Mod.C', Reg.fit.INT.C,
                              xlevels = list(Mod.C = c(-10,0,10),
