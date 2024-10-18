@@ -1,218 +1,170 @@
 #==============================================================================
 #                              Analysis Repository:                           #
-#                               Linear Regression                             #      
+#                               MLM                                            #      
 #==============================================================================
 
 #===========================================
 # Load Libraries                           #
-#==========================================-
+#===========================================
 
-library(psych) #has nice describe function for descriptive info
-library(tidyverse) #has dplyr and ggplot2
-library(multilevel) # also loads MASS and nlme
-library(corrplot) #nice cor plot
-library(ggpubr) #has some more GG plots
-library(lme4) #tool used for multilevel models
-library(jtools) #summ function good to get regression outputs
-library(ggstance) #Provides functions that Jtools uses
+# Libraries used for data analysis and visualization
+library(psych)        # Provides descriptive statistics functions
+library(tidyverse)    # A powerful set of packages for data manipulation and visualization (dplyr, ggplot2, etc.)
+library(multilevel)   # Tools for multilevel models, including hierarchical modeling
+library(corrplot)     # Provides visually appealing correlation matrix plots
+library(ggpubr)       # Adds publication-ready plots in ggplot2
+library(lme4)         # Used for building multilevel models
+library(jtools)       # Simplifies the output of regression models with user-friendly summaries
+library(ggstance)     # Extends ggplot2 by adding horizontal variants of common geoms
 
-#library(olsrr) #Some good regression functions and plotting tools
-#library(car) #Durbin-Watson test
-#library(MASS) #Shapiro-Wilk test
-#library(lmtest) #Breusch-Pagan test
-#library(pwr) #power analysis
-#library(Metrics) # used to calculate RMSE and MAE
-#library(caret) # used for cross validation 
-#library(mvnormtest) #normality
-
+# Note: Other libraries commented out can be used for further analysis, diagnostics, and cross-validation:
+# - olsrr: Functions for OLS regression diagnostics and visualization
+# - car: Tools for regression models (e.g., Durbin-Watson test)
+# - MASS: Provides additional statistical functions (e.g., Shapiro-Wilk test for normality)
+# - lmtest: Tools for heteroscedasticity (e.g., Breusch-Pagan test)
+# - pwr: Power analysis tools
+# - Metrics: RMSE and MAE calculation
+# - caret: Cross-validation and model training package
+# - mvnormtest: Tests for multivariate normality
 
 #===========================================
-# Simulate Data OR LOAD DATA               #
-#==========================================-
+# Simulate Data or Load Data               #
+#===========================================
+
 set.seed(101)
 
-data("klein2000")
-dat <- klein2000
-dat$GRPID <- as.factor(dat$GRPID)
+# Load a sample dataset
+data("klein2000")     # Load dataset used for multilevel analysis from multilevel package
+dat <- klein2000      # Assign to a variable
+dat$GRPID <- as.factor(dat$GRPID) # Convert group ID to factor
 
-#dat <- read.csv("data.csv", header=T)
-#dat <- readxl::read_xlsx("fake.data.xlsx")
-
+# Alternatively, load custom datasets if needed:
+# dat <- read.csv("data.csv", header=T)
+# dat <- readxl::read_xlsx("fake.data.xlsx")
 
 #===========================================
 # Overview                                 #
-#==========================================-
+#===========================================
 
-# If running multi-level regression, going to assume many aspects of regression have been used
-# If want help running more code for regression, see linear regression
-# This code is not exhaustive and mostly but focused on multi-level
-# Again, for data processing, assumptions, etc. see linear regression
-
-# Some overview of MLM, HLM, etc
-# Fixed effects - effects that don't vary
-# Random effects - effects that do vary
+# Multilevel modeling (MLM) or hierarchical linear modeling (HLM) is used when analyzing data where
+# the relationships vary across different groups or levels.
+# 
+# Key Concepts:
+# - Fixed effects: Effects that do not vary across groups.
+# - Random effects: Effects that vary across groups.
+# 
+# This script covers basic linear regression and extends to multilevel regression. 
+# Multilevel regression can model differences between groups by allowing intercepts and slopes to vary.
 
 #===========================================
 # Assess Descriptives                      #
-#==========================================-
+#===========================================
 
-# Mean, SD, Median, Min, Max, Skewness, and Kurtosis for y
+# Get summary statistics (mean, SD, median, skewness, kurtosis, etc.)
 psych::describe(dat)
-# Check for no extreme skewness or kurtosis, if so, may have to perform other analyses
 
-# Visualizations for distributions
-hist(dat$JOBSAT)
-ggdensity(dat$JOBSAT)
-boxplot(dat$JOBSAT)
-ggqqplot(dat$JOBSAT)
+# Visualize the distribution of key variables (e.g., Job Satisfaction - JOBSAT)
+hist(dat$JOBSAT)                   # Histogram
+ggdensity(dat$JOBSAT)              # Density plot
+boxplot(dat$JOBSAT)                # Boxplot
+ggqqplot(dat$JOBSAT)               # Q-Q plot to assess normality
 
-# Preliminary Exploration of Associations
-pairs.panels(dat, scale=TRUE)
-corrplot(cor(dat, use="complete.obs"), order = "hclust", tl.col='black', tl.cex=.75) 
+# Explore relationships between variables
+pairs.panels(dat, scale=TRUE)      # Scatterplot matrix with correlations
+corrplot(cor(dat, use="complete.obs"), order="hclust", tl.col='black', tl.cex=.75)  # Correlation plot
 
-# Scatter plot of two variables
-ggplot(dat,aes(PAY,JOBSAT)) +
+# Scatter plots to visualize relationships between predictors and the dependent variable (JOBSAT)
+ggplot(dat, aes(PAY, JOBSAT)) +
   geom_point() + 
   geom_smooth(method="lm", fullrange=T)
 
-# Lets look at this relationship within GROUPS! 
-# Can see how relationship may VARY across groups
-ggplot(dat,aes(PAY,JOBSAT)) +
+# Faceting by group to see how relationships vary across groups (e.g., GRPID)
+ggplot(dat, aes(PAY, JOBSAT)) +
   geom_point() + 
   geom_smooth(method="lm", fullrange=T) +
-  facet_wrap( ~ GRPID) 
+  facet_wrap(~GRPID)
 
-ggplot(dat,aes(POSAFF,JOBSAT)) +
-  geom_point() + 
-  geom_smooth(method="lm", fullrange=T) +
-  facet_wrap( ~ GRPID) 
+# Repeat for other predictors:
+ggplot(dat, aes(POSAFF, JOBSAT)) + geom_point() + geom_smooth(method="lm", fullrange=T) + facet_wrap(~GRPID)
+ggplot(dat, aes(WLOAD, JOBSAT)) + geom_point() + geom_smooth(method="lm", fullrange=T) + facet_wrap(~GRPID)
+ggplot(dat, aes(NEGLEAD, JOBSAT)) + geom_point() + geom_smooth(method="lm", fullrange=T) + facet_wrap(~GRPID)
 
-ggplot(dat,aes(WLOAD,JOBSAT)) +
-  geom_point() + 
-  geom_smooth(method="lm", fullrange=T) +
-  facet_wrap( ~ GRPID) 
-
-ggplot(dat,aes(NEGLEAD,JOBSAT)) +
-  geom_point() + 
-  geom_smooth(method="lm", fullrange=T) +
-  facet_wrap( ~ GRPID) 
-
-ggplot(dat,aes(x=NEGLEAD,y=JOBSAT,color=GRPID)) +
-  geom_point(size = .5) + 
-  geom_smooth(method ="lm", se=F, aes(group=GRPID)) +
+# Overlay groups in a single plot for NEGLEAD
+ggplot(dat, aes(x=NEGLEAD, y=JOBSAT, color=GRPID)) +
+  geom_point(size=0.5) + 
+  geom_smooth(method="lm", se=F, aes(group=GRPID)) +
   theme_classic() + 
-  theme(legend.position = "none")
-
+  theme(legend.position="none")
 
 #===========================================
-# Build Linear Model & Get Output                 #
-#==========================================-
+# Build Linear Model & Get Output          #
+#===========================================
 
-# May be interested in first fitting a NORMAL OSL LINEAR model
+# Fit a standard linear regression model predicting job satisfaction (JOBSAT)
+# Using pay (PAY), positive affect (POSAFF), workload (WLOAD), and negative leadership (NEGLEAD)
 Reg.fit <- lm(JOBSAT ~ PAY + POSAFF + WLOAD + NEGLEAD, data=dat)
-# Predict job satisfaction using pay, positve affect, negative leadership, and workload
 
+# Display detailed output including partial correlations and Variance Inflation Factors (VIFs)
 jtools::summ(Reg.fit, part.corr=TRUE, vifs=TRUE, digits=3)
-# Check relationships and fit 
-
 
 #===========================================
 # Build Multi-level Model & Get Output     #
-#==========================================-
+#===========================================
 
-# With multilevel modeling, can model both random intercept and random slope models
-# Random intercept = relationship between x and y is the same, but the actual predicted values may be higher or lower
-# Random slope = relationship between x and y is not the same
-# Again, both in reference to differences across groups 
+# With multilevel modeling, you can model both random intercept and random slope models:
+# - Random intercept: Relationship between predictors and outcome (e.g., PAY and JOBSAT) is the same,
+#                     but predicted values may vary across groups.
+# - Random slope: Relationship between predictors and outcome varies across groups.
 
 #====================== =
 # # Null Model        # #
 #====================== =
 
-# Can look 
-Random.Null.Fit <- lmer(JOBSAT ~ 1 + (1 | GRPID), 
-                              data=dat)
+# First, fit a null model with random intercepts only
+Random.Null.Fit <- lmer(JOBSAT ~ 1 + (1 | GRPID), data=dat)
 
+# Summarize the null model
 jtools::summ(Random.Null.Fit, digits=3)
 summary(Random.Null.Fit)
 
-# NOTE ICC which is the variance of intercept / (var intercept + var of residual)
-0.6835/(0.6835+5.4741)
-# ICC = .111
-# Correlation of job sat within same group is .111
-# Also suggests that .111 variance as at the job level, while the remaining is within jobs
-# ICC is variation at LEVEL 2
+# Calculate the Intraclass Correlation Coefficient (ICC), which indicates the proportion of variance 
+# between groups (Level 2 variance) vs. within groups (Level 1 variance)
+icc_value <- 0.6835/(0.6835 + 5.4741)
+# ICC interpretation: About 11% of the variation in job satisfaction is at the group level
 
 #====================== =
 # # Random Intercepts # #
 #====================== =
 
-# syntax for random intercept is (1 | groupping variable)
-Random.Intercepts.Fit <- lmer(JOBSAT ~ PAY + POSAFF + WLOAD + NEGLEAD + (1 | GRPID), 
-                              data=dat)
+# Fit a model with random intercepts, allowing variation in job satisfaction across groups
+Random.Intercepts.Fit <- lmer(JOBSAT ~ PAY + POSAFF + WLOAD + NEGLEAD + (1 | GRPID), data=dat)
 
+# Summarize the model with fixed effects and random intercepts
 jtools::summ(Random.Intercepts.Fit, digits=3)
-# jtools works with multilevel
-# Interpret the est and other fit just like OLS 
-# These are the FIXED effects
-# NOTE pseudo R-2 fixed = level 1 R2 - explains % variance among individals!!!
-# 
 
-# Can compare fit to the null model
+# Compare model fit between the null and random intercept model
 anova(Random.Null.Fit, Random.Intercepts.Fit)
-# Should be sig if the fixed effects are important
-
-# Get random effect details 
-summary(Random.Intercepts.Fit)
-# RANDOM EFFECTS INTERPRETATION
-# how much Jobsat varies between and within groups! 
-
-# Random effects GRPID = .5908 
-# This is how much variation there is BETWEEN GROUPS
-
-# Random effects residual = 3.966
-# This is how much variation there is WITHIN GROUPS
-
-# ICC (Inter Class Coefficient)
-# Ratio of total variation
-# Here is .130, so 13% of variation in jobsat exists between groups
-# While the remaining 87% exists within groups 
-
 
 #====================== =
 # # Random Slopes     # #
 #====================== =
 
-# syntax for random intercept is (predictor | groupping variable)
-Random.Slopes.Fit <- lmer(JOBSAT ~ PAY + POSAFF + WLOAD + NEGLEAD + (NEGLEAD | GRPID), 
-                              data=dat)
+# Fit a model with random slopes, allowing the relationship between NEGLEAD and JOBSAT to vary across groups
+Random.Slopes.Fit <- lmer(JOBSAT ~ PAY + POSAFF + WLOAD + NEGLEAD + (NEGLEAD | GRPID), data=dat)
 
-jtools::summ(Random.Intercepts.Fit, digits=3)
-# jtools works with multilevel
+# Summarize the random slope model
+jtools::summ(Random.Slopes.Fit, digits=3)
 
-# Can compare fit between random intercept and slope
-anova(Random.Intercepts.Fit,Random.Slopes.Fit)
-# Should be mentioned that modeling random slope is also part theoretical
-# Not just data driven, even if improve model fit, consider if worth adding 
-
-# Get random effect details 
-summary(Random.Slopes.Fit)
-
-# Now have random effects for intercept, slope, and residual
-
+# Compare the random intercept model with the random slope model
+anova(Random.Intercepts.Fit, Random.Slopes.Fit)
 
 #====================== =
 # # Mean Centering    # #
 #====================== =
 
-# A note on mean centering
-# Mean centering in MLM is important! 
-# Can group and grand mean center
-# e.g., center all scores to the grand mean
-# OR center scores to GROUP mean
-# Most common to center to grand, but can be helpful at times/certain contexts to center to group
-
-# Grand mean - controls for variance at level 1 prior to level 2
-# Group mean - does not estimate incremental models, does not control for level 1 variance
-#       Further, group mean separately estimates group regression and between group regression 
-
+# Mean centering predictors is a crucial step in multilevel modeling. Centering can be done in two ways:
+# - Grand Mean Centering: Centers variables relative to the overall mean across all groups.
+# - Group Mean Centering: Centers variables relative to the mean within each group.
+# 
+# Grand mean centering controls for variance at Level 1 prior to Level 2 analysis, while group mean 
+# centering separates within-group and between-group variation in regression slopes.
