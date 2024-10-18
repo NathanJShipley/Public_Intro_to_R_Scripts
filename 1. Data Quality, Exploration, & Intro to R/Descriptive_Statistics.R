@@ -5,91 +5,85 @@
 
 #===========================================
 # Load Libraries                           #
-#==========================================-
-library(psych) # For Descriptive and other useful functions 
-library(tidyverse) #has dplyr and ggplot2
-library(ggpubr) #some more visualizations 
-library(janitor) #Tabyl function
-library(finalfit) # Missing Functions
-library(corrplot) #nice cor plot
+#==========================================
+# Import necessary libraries for data manipulation, visualization, and analysis.
+library(psych)        # For descriptive statistics and useful functions
+library(tidyverse)    # A collection of packages including dplyr and ggplot2 for data manipulation and visualization
+library(ggpubr)       # Provides additional ggplot2 functionalities for visualizations
+library(janitor)      # Contains functions for cleaning and inspecting data, including the 'tabyl' function
+library(finalfit)     # Functions for dealing with missing data
+library(corrplot)     # Functions for creating correlation plots
+
 
 #===========================================
 # Simulate Data OR LOAD DATA               #
-#==========================================-
-
+#==========================================
+# Load the iris dataset, a well-known dataset for flower species classification
 data("iris")
-dat <- iris
-# Load built in dataset
+dat <- iris # Assign the iris dataset to the variable 'dat'
 
+# Load a simulated pay dataset from a CSV file
 dat.pay <- read.csv("data/Sim_Pay_Data.csv", header=T)
-#dat <- readxl::read_xlsx("fake.data.xlsx")
+# Uncomment the following line to load data from an Excel file
+# dat <- readxl::read_xlsx("fake.data.xlsx")
 
 
 #===========================================
 # Some brief data manipulation             #
-#==========================================-
+#==========================================
+# Create a new categorical variable 'Sepal.size' based on the median of Sepal.Length
+dat$Sepal.size <- ifelse(dat$Sepal.Length < median(dat$Sepal.Length), "small", "big")
 
-dat$Sepal.size <- ifelse(dat$Sepal.Length < median(dat$Sepal.Length),
-                   "small", "big")
+# Create another categorical variable 'Sepal.wide' based on the median of Sepal.Width
+dat$Sepal.wide <- ifelse(dat$Sepal.Width < median(dat$Sepal.Width), "small", "big")
 
-dat$Sepal.wide <- ifelse(dat$Sepal.Width < median(dat$Sepal.Width),
-                         "small", "big")
+
 #===========================================
 # Assess Missing Data                      #
-#==========================================-
+#==========================================
+# Visualize missing data in the 'dat.pay' dataset using heat maps
+missing_plot(dat.pay)                              # General heatmap of missing values
+missing_plot(dat.pay, dependent = "RACE")         # Heatmap of missing values dependent on 'RACE'
+missing_plot(dat.pay, dependent = "PAY_NUM")      # Heatmap of missing values dependent on 'PAY_NUM'
+missing_plot(dat.pay, dependent = "PAY_NUM", explanatory = "RACE") # Explore missing patterns by 'RACE'
+missing_plot(dat.pay, dependent = "RACE", explanatory = "GENDER")   # Explore missing patterns by 'GENDER'
 
-# Heat Map of Missing values in Dataset
-missing_plot(dat.pay)
-missing_plot(dat.pay, dependent = "RACE")
-missing_plot(dat.pay, dependent = "PAY_NUM")
-# Can examine if things differ based on other factors
-missing_plot(dat.pay, dependent = "PAY_NUM", explanatory = "RACE")
-missing_plot(dat.pay, dependent = "RACE", explanatory = "GENDER")
-
-# A matrix of missing data patterns
-# 1 indicates observed, 0 is missing
-# Rows and columns sorted in increasing amount of missing information
+# Generate a matrix showing missing data patterns
+# 1 indicates observed values, 0 indicates missing values
+# This allows assessment of the structure of missing data
 missing_pattern(dat.pay)
-# Numbers on right indicate # of observations in each pattern
-# Numbers on bottom indicate # of data missing per pattern
-missing_pattern(dat.pay,dependent = "PAY_NUM", explanatory = c("RACE","GENDER"))
-# Can select a few specific variables 
 
-missing_compare(dat.pay, dependent = "PAY_NUM", explanatory = c("RACE","GENDER"))
-# Can compare patterns of missing data in a specific variable based on explanatory variables 
+# Display counts of observations per missing pattern
+missing_pattern(dat.pay, dependent = "PAY_NUM", explanatory = c("RACE", "GENDER"))
+
+# Compare missing data patterns based on explanatory variables
+missing_compare(dat.pay, dependent = "PAY_NUM", explanatory = c("RACE", "GENDER"))
 
 
 #===========================================
 # Check Structure of Data                  #
-#==========================================-
-
-head(dat)
-# can see column headers
-
-View(dat)
-# can see data directly
-
-dat[1,]
-# Data for first row
-
-dat[,1]
-# Data for first column
+#==========================================
+# View the first few rows of the dataset to understand its structure
+head(dat)                # Displays the first six rows
+View(dat)               # Opens the dataset in a viewer window
+dat[1,]                 # Access the first row of the dataset
+dat[,1]                 # Access the first column of the dataset
 
 
 #===========================================
 # Univariate Descriptive Data              #
-#==========================================-
+#==========================================
+# Generate summary statistics for the dataset
+summary(dat)            # Provides min, mean, max, and quartiles for each variable
 
-summary(dat)
-# gives min, mean, max, quartiles for each variable 
+# Use psych package to provide a detailed description of the dataset
+psych::describe(dat)                     # Provides additional stats like mean, SD, skewness, kurtosis
+psych::describe(dat$Sepal.Length)       # Summary statistics specifically for 'Sepal.Length'
 
-psych::describe(dat)
-psych::describe(dat$Sepal.Length)
-# Both of these provide additional stats such as mean, SD, median, skewness, and kurtosis
+# Create a basic frequency table for the 'Species' variable
+tabyl(dat, Species)
 
-tabyl(dat,Species)
-# A basic frequency table
-
+# Format the frequency table to include percentage formatting
 dat %>%
   tabyl(Species) %>%
   adorn_pct_formatting(digits = 0, affix_sign = T)
@@ -97,91 +91,87 @@ dat %>%
 
 #===========================================
 # Univariate Data Visualizations           #
-#==========================================-
+#==========================================
+# Generate various plots to visualize the distribution of 'Sepal.Length'
+hist(dat$Sepal.Length)                         # Histogram
+ggdensity(dat$Sepal.Length)                    # Density plot
+boxplot(dat$Sepal.Length)                      # Box plot
+ggqqplot(dat$Sepal.Length)                     # QQ plot for checking normality
 
-hist(dat$Sepal.Length)
-# Histogram 
+# Create a box plot with notches to indicate confidence intervals around the median
+ggplot(dat, aes(y = Sepal.Length)) + 
+  geom_boxplot(notch = TRUE)
 
-ggdensity(dat$Sepal.Length)
-# Density plot, similar to histogram
-
-boxplot(dat$Sepal.Length)
-# Box plot
-
-ggqqplot(dat$Sepal.Length)
-# QQ plot for univariate 
-
-ggplot(dat,aes(y=Sepal.Length)) + 
-  geom_boxplot(notch=T)
-# Boxplot of quantiles and mean
-
-ggplot(dat,aes(Sepal.Length)) + 
+# Histogram of 'Sepal.Length' with specified number of bins
+ggplot(dat, aes(Sepal.Length)) + 
   geom_histogram(bins = 10)
-# Distribution histogram 
 
-ggplot(dat, aes(x=Species)) + 
+# Bar plot showing counts of each species
+ggplot(dat, aes(x = Species)) + 
   geom_bar()
-# Counts of categorical 
 
 
 #===========================================
 # Multivariate Descriptive Data            #
-#==========================================-
-
+#==========================================
+# Get descriptive statistics for 'Sepal.Length' by species category
 psych::describeBy(Sepal.Length ~ Species, data = dat)
-# Get mean, SD, etc for variable by category 
 
-tabyl(dat,Species,Sepal.size)
-# Frequency for multiple categorical & continuous 
+# Create a frequency table for 'Species' and the new 'Sepal.size' variable
+tabyl(dat, Species, Sepal.size)
 
 
 #===========================================
 # Multivariate Data Visualizations         #
-#==========================================-
+#==========================================
+# Create pairwise scatter plots and correlation coefficients
+pairs.panels(dat, scale = TRUE)  # All variables with scaling
+pairs.panels(select(dat, 1:5))   # First five variables without scaling
 
-pairs.panels(dat, scale=TRUE)
-# Show correlations and scatter plots for all data
+# Create a correlation plot for the first four numerical variables
+corrplot(cor(dplyr::select(dat, 1:4), use = "complete.obs"), order = "hclust", tl.col = 'black', tl.cex = .75) 
 
-pairs.panels(select(dat, 1:5)) 
-# Selected first 5 variables, removed scale
+# Scatter plot with a linear regression line for Petal.Length and Petal.Width
+ggplot(dat, aes(Petal.Length, Petal.Width)) + 
+  geom_point(color = "darkblue") + 
+  geom_smooth(color = "blue", size = 1.5, method = 'lm') + 
+  ggtitle("Relationship between Petal Length and Width") + 
+  theme(plot.title = element_text(hjust = 0.5))
 
-# Another visualization
-corrplot(cor(dplyr::select(dat,1:4), use="complete.obs"), order = "hclust", tl.col='black', tl.cex=.75) 
-
-ggplot(dat,aes(Petal.Length,Petal.Width)) + 
-  geom_point(color="darkblue") + 
-  geom_smooth(color="blue",size=1.5, method='lm') + 
-  ggtitle("Relationship between Petal Length and Width") + theme(plot.title = element_text(hjust = 0.5))
-
-ggplot(dat, aes(x=Species, y=Sepal.Length, color = Species)) + 
-  geom_boxplot(notch=TRUE) + 
+# Box plot of Sepal.Length by Species with notches
+ggplot(dat, aes(x = Species, y = Sepal.Length, color = Species)) + 
+  geom_boxplot(notch = TRUE) + 
   theme_classic()
 
-ggplot(dat, aes(x=Sepal.Length, color = Species)) + 
-  geom_histogram(aes(y = ..density..),
-                 colour = 1, fill = "white",
-                 bins = 10) +
+# Histogram of Sepal.Length with density overlay, faceted by Species
+ggplot(dat, aes(x = Sepal.Length, color = Species)) + 
+  geom_histogram(aes(y = ..density..), colour = 1, fill = "white", bins = 10) +
   geom_density(size = 1) + 
   facet_wrap(~ Species) + 
   theme_classic()
 
-
-ggplot(dat, aes(x=Sepal.size, y = Sepal.Length, fill = Sepal.wide)) + 
+# Violin plot showing the distribution of Sepal.Length by Sepal.size and colored by Sepal.wide
+ggplot(dat, aes(x = Sepal.size, y = Sepal.Length, fill = Sepal.wide)) + 
   geom_violin(trim = FALSE) + 
   theme_classic()
-  
-ggplot(dat, aes(x=Sepal.size, y = Petal.Length, fill = Species)) + 
+
+# Violin plot of Petal.Length by Sepal.size and colored by Species
+ggplot(dat, aes(x = Sepal.size, y = Petal.Length, fill = Species)) + 
   geom_violin(trim = FALSE) +  
   theme_classic()
 
+# Scatter plot with marginal histograms for Sepal.Length and Sepal.Width
 ggscatterhist(iris, x = "Sepal.Length", y = "Sepal.Width",
               margin.params = list(fill = "lightgray"))
 
+# Scatter plot with marginal histograms for Sepal.Length and Sepal.Width, colored by Species
 ggscatterhist(iris, x = "Sepal.Length", y = "Sepal.Width",
               color = "Species", size = 3, alpha = 0.6,
               palette = c("#00AFBB", "#E7B800", "#FC4E07"),
               margin.params = list(fill = "Species", color = "black", size = 0.2))
 
-
 # Assess Multivariate Outliers
-psych::outlier(dplyr::select(dat,1:4))
+psych::outlier(dplyr::select(dat, 1:4))  # Check for outliers in the first four variables
+
+
+
