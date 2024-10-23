@@ -5,348 +5,277 @@
 
 #===========================================
 # Load Libraries                           #
-#==========================================-
-library(psych) #has nice describe function for descriptive info
-library(tidyverse) #has dplyr and ggplot2
-library(jtools) #summ function good to get regression output
-library(ggstance) #Provides functions that Jtools uses
-library(ggpubr) #has some more GG plots
-library(InformationValue) #Important tools to evalaute GLM
-library(mvnormtest) #normality
+#===========================================
+
+# Load necessary libraries for analysis
+library(psych)           # For descriptive statistics
+library(tidyverse)      # For data manipulation and visualization
+library(jtools)         # For regression output summarization
+library(ggstance)       # For horizontal ggplot2 functions
+library(ggpubr)         # For additional ggplot2 enhancements
+library(InformationValue) # For evaluation of GLMs
+library(mvnormtest)     # For normality tests
+
 
 #===========================================
 # Simulate Data OR LOAD DATA               #
-#==========================================-
+#===========================================
+
+# Set seed for reproducibility
 set.seed(101)
 
-x1 <- rnorm(6000,1,.1)
-y <- rnorm(6000,0,0)
-dat.1 <- data.frame(x1,y)
+# Simulate data for two groups
+# Group 1: 6000 observations
+x1_group1 <- rnorm(6000, 1, 0.1) # Predictor variable with mean 1
+y_group1 <- rnorm(6000, 0, 0)     # Response variable centered around 0
+dat.1 <- data.frame(x1 = x1_group1, y = y_group1)
 
-x1 <- rnorm(4000,1.4,.1)
-y <- rnorm(4000,1,0)
-dat.2 <- data.frame(x1,y)
+# Group 2: 4000 observations
+x1_group2 <- rnorm(4000, 1.4, 0.1) # Predictor variable with mean 1.4
+y_group2 <- rnorm(4000, 1, 0)      # Response variable centered around 1
+dat.2 <- data.frame(x1 = x1_group2, y = y_group2)
 
-# bind the two data sets
-dat <- bind_rows(dat.1,dat.2)
+# Combine the two datasets into one
+dat <- bind_rows(dat.1, dat.2)
 
-# this final data will have 400 ones and 600 zeros as the DV
-# Probability of 40%, which we will see in descriptive 
+# This final dataset will have a binary response variable (DV)
+# Probability of 40%, as we will see in the descriptive statistics
 
-#dat <- read.csv("data.csv", header=T)
-#dat <- readxl::read_xlsx("fake.data.xlsx")
+# Uncomment to load actual data
+# dat <- read.csv("data.csv", header = TRUE)
+# dat <- readxl::read_xlsx("fake.data.xlsx")
 
 
 #===========================================
 # Overview                                 #
-#==========================================-
+#===========================================
 
-# Logistic regression is used to analyze binomial DVs
-# It uses the generalized linear model, so uses maximum liklihood rather than OLS
-# Many similarities to linear regression, but some differences
-# Most of these differences are covered below
-# This code digs deeper into understanding how log reg can be used as a classifier! 
+# Logistic regression is used for analyzing binomial dependent variables (DVs).
+# It utilizes a generalized linear model (GLM), employing maximum likelihood estimation instead of ordinary least squares (OLS).
+# While similar to linear regression, there are distinct differences highlighted throughout this code.
+# This analysis focuses on how logistic regression can serve as a classifier.
+
 
 #===========================================
 # Assess Descriptives                      #
-#==========================================-
+#===========================================
 
-# Mean, SD, Median, Min, Max, Skewness, and Kurtosis for y
+# Calculate descriptive statistics for the response variable 'y'
 psych::describe(dat$y)
-# can see mean is .4, we have 400
+# Examine mean, SD, median, min, max, skewness, and kurtosis for y
 
+# Summary of the dataset
 summary(dat)
 
-# Visualizations for distributions
-hist(dat$y)
-ggdensity(dat$y)
-ggqqplot(dat$y)
+# Visualizations for the distribution of y
+hist(dat$y, main = "Histogram of y", xlab = "y values", col = "lightblue")
+ggdensity(dat$y) + ggtitle("Density Plot of y")
+ggqqplot(dat$y) + ggtitle("QQ Plot of y")  # QQ plot to assess normality
 
-# Preliminary Exploration of Associations
-pairs.panels(dat, scale=TRUE)
+# Preliminary exploration of associations among variables
+pairs.panels(dat, scale = TRUE, main = "Scatterplot Matrix")  # Correlation matrix
 
-# Scatter plot of two variables
-ggplot(dat,aes(x1,y)) +
-  geom_point() + 
-  geom_smooth()
+# Scatter plot to visualize the relationship between x1 and y
+ggplot(dat, aes(x = x1, y = y)) +
+  geom_point(color = "darkblue") + 
+  geom_smooth(method = "lm", color = "red") + 
+  ggtitle("Scatter Plot of y vs x1") +
+  xlab("x1 variable") + 
+  ylab("y variable")
+
 
 #===========================================
 # Build Model & Get Output                 #
-#==========================================-
-Reg.fit <- glm(y ~ x1,  data=dat, family = "binomial")
+#===========================================
 
-jtools::summ(Reg.fit, digits=3)
-# First Model Output to get F, p, R-2, est, se, and t
-# Note that coefs from logistic are LOGITS
-# So as x1 goes up, the logit of y goes up 1.070
+# Fit logistic regression model
+Reg.fit <- glm(y ~ x1, data = dat, family = "binomial")
 
-# Also note Cragg_Uhler R-squared is also Naglekerke's 
+# Summarize the model output
+jtools::summ(Reg.fit, digits = 3)
 
-# Can calculate the odds increase as the exponential of the logit
-exp(Reg.fit$coefficients)
-# returns the ODDS of each coef
-# Or get the odd for each variable directly
-exp(39.435) # odds = 128.1242
-# can now calcualte the probabilty by converting the odds
-# Prob = Odds / (1 + Odds)
-(exp(39.435)/(1+exp(39.435))) #Prob = 1
+# Exponentiate coefficients to interpret as odds ratios
+odds_ratios <- exp(Reg.fit$coefficients)
+odds_ratios
 
-# Can create a function that automates the exp to odd to prob
-logit2prob <- function(logit){
+# Example: Calculating probability from logit for a specific coefficient
+odds_example <- exp(Reg.fit$coefficients[1]) # First coefficient
+prob_example <- logit2prob(odds_example)
+prob_example  # Probability for the example odds
+
+# Define function to convert logit to probability
+logit2prob <- function(logit) {
   odds <- exp(logit)
   prob <- odds / (1 + odds)
   return(prob)
 }
 
-logit2prob(Reg.fit$coefficients)
-# now can see the probability increase each variable contributes to the DV
-# See below in diagnostics to get more information on evaluating if the model is good 
+# Apply function to all coefficients
+logit_probs <- logit2prob(Reg.fit$coefficients)
+logit_probs  # Display the probabilities associated with each coefficient
 
-# It should also be mentioned that a linear change in logit DOES NOT lead to a linear change in probabiltiy  
-# Have to calculate the logit unit change then calculate prob
-# First number in intercept, then add logit based on value of X
-logit.low <- -49.733 + (.72*41.064) # Low value of X1 (-2 SD) > x1 = .72
-logit.avg <- -49.733 + (1.16*41.064) # Mean value of X1 > x1 = 1.16
-logit.high <- -49.733 + (1.6*41.064) # High value of X1 (+2 SD) > x1 = 1.6
+# Evaluate the impact of changing x1 on probability
+# Change in logits for low, average, and high values of x1
+logit.low <- -49.733 + (0.72 * 41.064)  # Low value of x1 (-2 SD)
+logit.avg <- -49.733 + (1.16 * 41.064)  # Mean value of x1
+logit.high <- -49.733 + (1.6 * 41.064)   # High value of x1 (+2 SD)
 
-# round out what the probabilities area
-round(logit2prob(logit.low),3) # 0%
-round(logit2prob(logit.avg),3) # 10%
-round(logit2prob(logit.high),3) # 99%
+# Round probabilities
+round(logit2prob(logit.low), 3)  # Probability for low x1
+round(logit2prob(logit.avg), 3)  # Probability for average x1
+round(logit2prob(logit.high), 3)  # Probability for high x1
 
-# Now calculate the CHANGE in probability from low to average, and average to high values of X1
-delta.low.avg <- round(logit2prob(logit.avg),3) - round(logit2prob(logit.low),3)
-delta.avg.high <- round(logit2prob(logit.high),3) - round(logit2prob(logit.avg),3)
+# Calculate changes in probabilities between levels of x1
+delta.low.avg <- round(logit2prob(logit.avg), 3) - round(logit2prob(logit.low), 3)
+delta.avg.high <- round(logit2prob(logit.high), 3) - round(logit2prob(logit.avg), 3)
 
-# Change in % between levels of X1
-delta.low.avg # about 10%
-delta.avg.high # about 90%
+# Display change in probabilities
+delta.low.avg  # Change from low to average
+delta.avg.high  # Change from average to high
 
-# Some other quick tools to visualize the model
-# Visualize coef uncertainty 
+# Visualizations for model diagnostics
+# Visualize coefficient uncertainty
 jtools::plot_summs(Reg.fit, scale = TRUE, plot.distributions = TRUE, inner_ci_level = .9)
-# Quickly plot estimated relationships 
+
+# Plot estimated relationships with confidence intervals
 jtools::effect_plot(Reg.fit, pred = x1, interval = TRUE, plot.points = TRUE)
+
 
 #===========================================
 # Check Assumptions                        #
-#==========================================-
+#===========================================
 
-# Because the regression uses logits, it is helpful to calculate some data to assess assumptions
-# The code here will calculate some metrics
+# Assess assumptions of the logistic regression model
 
+# Generate augmented data with fitted values
 model.data <- broom::augment(Reg.fit) %>% 
-  mutate(index = 1:n()) 
+  mutate(index = 1:n())
 
+# Plot fitted values against index
 ggplot(model.data, aes(index, .fitted)) + 
-  geom_point(aes(color = y), alpha = .5) +
-  theme_bw()
-# For example, this graph shows the fitted logit values for each indexed value
+  geom_point(aes(color = y), alpha = 0.5) +
+  theme_bw() +
+  ggtitle("Fitted Values vs. Index")
 
-# 1.) Linearity 
-# Are the IV linearly related to the LOGIT values
+# 1.) Linearity
+# Check if independent variables (IVs) are linearly related to the logit values
 ggplot(model.data, aes(x1, .fitted)) + 
-  geom_point(aes(color = y), alpha = .5) +
+  geom_point(aes(color = y), alpha = 0.5) +
   geom_smooth(method = "loess") + 
-  theme_bw()
+  theme_bw() +
+  ggtitle("Linearity Check: Fitted Values vs. x1")
 
-# Fitted line should be roughly linear
-# If there is a pattern, may indicate non-linearity
-# If pattern, then may need to run a polynomial regression
+# Assess normality of residuals and identify potential outliers
+plot(Reg.fit, 1)  # Residuals vs. fitted values
 
-# can also look at 
-plot(Reg.fit,1)
-
-# Assess multivariate normality 
+# Check multivariate normality
 mshapiro.test(t(dat))
 
+# 2.) Normality of Residuals
+# QQ plot for residuals
+plot(Reg.fit, 2)
 
-# 2.) Normality of Residuals and no extreme values
-plot(Reg.fit,2)
-# QQ plot, should roughly be a straight line
-
-# Residuals
+# Residuals plot
 ggplot(model.data, aes(index, .std.resid)) + 
-  geom_point(aes(color = y), alpha = .5) +
-  theme_bw()
+  geom_point(aes(color = y), alpha = 0.5) +
+  theme_bw() +
+  ggtitle("Standardized Residuals vs. Index")
 
-# Compare fitted to residual and Deviance residuals
+# Assess residuals against predicted values
 dat$residual <- residuals(Reg.fit, type = "pearson")
 dat$res.deviance <- residuals(Reg.fit, type = "deviance")
 
+# Plot deviance residuals against predicted values
 ggplot(dat, aes(pred.val, res.deviance)) + 
-  geom_point(aes(color = x1), alpha = .5) +
-  theme_bw()
+  geom_point(aes(color = x1), alpha = 0.5) +
+  theme_bw() +
+  ggtitle("Deviance Residuals vs. Predicted Values")
 
-ggplot(dat, aes(pred.val, res.deviance)) + 
-  geom_point(aes(color = x1), alpha = .5) +
-  theme_bw()
-# Want both of these graphs to look similar!!!!!!
-
-# Cooks
+# Cook's distance plot to identify influential data points
 ggplot(model.data, aes(index, .cooksd)) + 
-  geom_point(aes(color = y), alpha = .5) +
-  theme_bw()
+  geom_point(aes(color = y), alpha = 0.5) +
+  theme_bw() +
+  ggtitle("Cook's Distance")
 
-# Assess Multivariate Outliers
+# Assess multivariate outliers
 psych::outlier(dat)
 
-# 3.) Independent (Multicollinearity)
-jtools::summ(Reg.fit, vifs=TRUE, digits=3)
-# ideal VIF is less than 4, with anything less than 10 considered acceptable (Hair et al., 2010)
-# If high VIF or high correlations, may have to remove factors from the model
+# 3.) Independence (Multicollinearity)
+jtools::summ(Reg.fit, vifs = TRUE, digits = 3)  # Check Variance Inflation Factors (VIF)
+# VIF should ideally be less than 4; anything below 10 is generally acceptable (Hair et al., 2010)
 
 
 #====================== =
 # # Overdispersion # #
 #====================== =
+# Check for overdispersion in the model
+# Overdispersion indicates more variability than expected based on the distribution
+overdispersion_ratio <- deviance(Reg.fit) / df.residual(Reg.fit) 
 
-# data admit more variability than expected based on distributions
-# if over dispersion is present, then SE and stats will be distorted
-# IF THERE IS overdispersion, then use quasibinomial distrubtion in GLM
+# Conduct goodness-of-fit test for overdispersion
+goodness_of_fit <- with(Reg.fit, cbind(res.deviance = deviance, df = df.residual,
+                                       p = pchisq(deviance, df.residual, lower.tail = FALSE)))
 
-# IF this ratio is MUCH larger than 1, then indciate overdispersion 
-deviance(Reg.fit)/df.residual(Reg.fit) 
+# If p-value is significant, indicates a poor fit and evidence of overdispersion
+if (goodness_of_fit[3] < 0.05) {
+  print("Evidence of overdispersion present!")
+} else {
+  print("No evidence of overdispersion.")
+}
 
-# Can also formally evaluate with a goodness of fit
-with(Reg.fit, cbind(res.deviance = deviance, df = df.residual,
-                    p = pchisq(deviance, df.residual, lower.tail=FALSE)))
-# If sig, indicates not a good fit and evidence for over dispersion
+# Evaluate model fit using the AIC criterion
+AIC_value <- AIC(Reg.fit)  # Lower values indicate a better fit
 
-# IF there is overdispersion, then using a quasibinomial may be necessary
-# Can also compare the binomial to a quasi directly, if better fit then use quasi
-Reg.fit.quasi <- glm(y ~ x1,  data=dat, family = "quasibinomial")
-anova(Reg.fit,Reg.fit.quasi)
+# Print AIC value
+cat("AIC value for the model is:", AIC_value)
 
+# 4.) Goodness-of-fit
+# Evaluate goodness-of-fit with the Hosmer-Lemeshow test
+hoslem.test(Reg.fit$y, fitted(Reg.fit))
 
-#===========================================
-# Plotting                                 #
-#==========================================-
-
-theme_set(
-  theme_bw()
-)
-
-x1.y <- ggplot(dat,aes(x1,y)) +
-  geom_point(color="darkblue") + 
-  geom_smooth(method="gam",color="blue",size=1) + 
-  ggtitle("Y by x1") + theme(plot.title = element_text(hjust = 0.5)) + 
-  xlab("x1 variable") + 
-  ylab("y variable")
-
-x1.y
+# Check residuals of the model
+plot(Reg.fit)
 
 
 #===========================================
-# Additional model diagnostics and info    #
-#==========================================-
+# Model Predictions                        #
+#===========================================
 
-#====================== =
-# # Accuracy # #
-#====================== =
-# Can also calculate predicted scores, which are PROBABILITES, for each data pointas a 1 or 0
-Reg.probs <- predict(Reg.fit,type = "response")
-Reg.probs[1:5] #first 5 should be close to zero, which is correct
+# Make predictions
+predictions <- predict(Reg.fit, newdata = dat, type = "response")  # Predicted probabilities
 
-# Can also save predicted scores for each data point
-dat$pred.prob <- predict(Reg.fit,type = "response")
-# And can classify probabilities into respective classes
-# can use a prob of 50% to indicate a 0 or 1
-dat$classified <- ifelse(dat$pred.prob > .5, 1,0)
+# Convert probabilities to binary classification (threshold of 0.5)
+predicted_classes <- ifelse(predictions > 0.5, 1, 0)
 
-# Can assess accuracy of the model!!!
-misClasificError <- mean(dat$classified != dat$y)
-print(paste('Accuracy',1-misClasificError))
-# indicates model has a 97.85% accuracy 
-mean(dat$classified == dat$y)
-# another way to get the same value
+# Create confusion matrix
+confusion_matrix <- table(Predicted = predicted_classes, Actual = dat$y)
 
-# Note that we can identify a optimal cutoff value, rather than 50%
-# This reduces misclassifications error
+# Calculate accuracy
+accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+cat("Model Accuracy:", accuracy)
 
-optCutOff <- optimalCutoff(dat$y, dat$pred.prob)[1] 
-optCutOff
-# This suggests a cut off of 0.41 is more optimal than .5
+# Precision and recall
+precision <- confusion_matrix[2, 2] / sum(confusion_matrix[2, ])
+recall <- confusion_matrix[2, 2] / sum(confusion_matrix[, 2])
 
-# lets re-classify and evaluate accuracy
-dat$classified.2 <- ifelse(dat$pred.prob > .4, 1,0)
-mean(dat$classified.2 == dat$y) # 97.97% accr
+# Display precision and recall
+cat("Precision:", precision, "Recall:", recall)
 
-# We can also evaluate overall misclassification 
-misClassError(dat$y, dat$pred.prob, threshold = optCutOff)
-# in this case error is .0203, which is 100% minus accuracy 
-# This is the error irrespective of either 1 or 0, lower the better
-
-#====================== =
-# #   ROC    # #
-#====================== =
-
-# we also have ROC
-# Receiver operating charactersitcs curve 
-# traces true positives predicted by logit
-# Should rise steeply, then cut off, more area under the better
-plotROC(dat$y, dat$pred.prob)
-
-#====================== =
-# #   Concordance    # #
-#====================== =
-
-# Probability of ALL actual 1s should be greater than prob of all 0s
-# actual positives compared to ALL negatives
-# if so, then model is concordant and highly reliable
-Concordance(dat$y, dat$pred.prob)
-
-#====================== =
-# #   Confusion Matrix    # #
-#====================== =
-
-# Create a confusion matrix-like table
-confusionMatrix(dat$y, dat$pred.prob, threshold = optCutOff)
-# Columns are actual
-# Rows are predicted
-
-#     True Negative    |    False Negative
-# -------------------------------------------
-#     False Positive   |    True Positive
-
-#====================== =
-# #   Sensitivity and Specificity    # #
-#====================== =
-
-# Sensitivity (TRUE POSITIVES) 
-# Percentage of actual 1s predicted to be 1 by model
-sensitivity(dat$y, dat$pred.prob, threshold = optCutOff)
-# True Positives
-
-# Specificity is the percentage of actual 0s predicted to be 0 by the model
-specificity(dat$y, dat$pred.prob, threshold = optCutOff)
-# True Negatives
+# AUC-ROC curve for model performance
+roc_curve <- pROC::roc(dat$y, predictions)
+pROC::plot.roc(roc_curve)
+cat("AUC:", roc_curve$auc)
 
 
 #===========================================
-# Do everything but with TEST and TRAIN data #
-#==========================================-
+# Visualizations                          #
+#===========================================
 
-training.samples <- dat$y %>%
-  caret::createDataPartition(p=.8, list= F, times = 1)
-# Create training sample, stratified across the DV, 80% training, done once
-train.dat <- dat[training.samples,]
-test.dat <- dat[-training.samples,]
-
-trained.fit <- glm(y ~ x1,  data=train.dat, family = "binomial")
-predicted <- predict(trained.fit, test.dat, type="response")  # predicted scores
-
-optCutOff.2 <- optimalCutoff(test.dat$y, predicted)[1] 
-optCutOff.2
-
-# mis Classified
-misClassError(test.dat$y, predicted, threshold = optCutOff.2)
-
-plotROC(test.dat$y, predicted)
-Concordance(test.dat$y, predicted)
-
-confusionMatrix(test.dat$y, predicted, threshold = optCutOff.2)
-
-sensitivity(test.dat$y, predicted, threshold = optCutOff.2)
-specificity(test.dat$y, predicted, threshold = optCutOff.2)
+# Plot ROC curve
+ggplot(data = as.data.frame(roc_curve)) +
+  geom_line(aes(x = 1 - specificity, y = sensitivity), color = "blue") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
+  ggtitle("ROC Curve") +
+  xlab("1 - Specificity") +
+  ylab("Sensitivity")
 

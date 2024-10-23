@@ -4,159 +4,169 @@
 #==============================================================================
 
 #===========================================
-# Load Libraries                           #
-#==========================================-
-library(psych) #has nice describe function for descriptive info
-library(dplyr) #pipes and other formatting tools
-#library(olsrr) #Some good regression functions and plotting tools
-#library(jtools) #summ function good to get regression output
-library(ggplot2) #plot funtions 
-library(ggpubr) #has some more GG plots
-#library(car) #Durbin-Watson test
-#library(MASS) #Shapiro-Wilk test
-#library(lmtest) #Breusch-Pagan test
+# Load Required Libraries                 #
+#===========================================
+# Load libraries essential for data manipulation, statistical analysis, and visualization.
+library(psych)        # Contains functions for descriptive statistics (e.g., describe)
+library(dplyr)        # Offers data manipulation functions, including piping (%>%)
+# library(olsrr)      # (Optional) Contains functions for regression diagnostics and plotting
+# library(jtools)     # (Optional) Useful for summarizing regression output
+library(ggplot2)      # Provides extensive visualization capabilities
+library(ggpubr)       # Contains additional ggplot functions for enhanced plotting
+# library(car)        # (Optional) Contains functions for regression diagnostics, including the Durbin-Watson test
+# library(MASS)       # (Optional) Contains functions for normality tests like Shapiro-Wilk
+# library(lmtest)     # (Optional) Contains functions for hypothesis testing in linear models, including Breusch-Pagan test
 
 #===========================================
 # Simulate Data OR LOAD DATA               #
-#==========================================-
-set.seed(101)
+#===========================================
+set.seed(101) # Set seed for reproducibility of random numbers
 
-x1 <- rnorm(1000,1,1)
-x2 <- rnorm(1000,1,1)
-x3 <- I(x1^2)
-x4 <- I(x1^3)
-# NOTE need to do I(x^2) to include ONLY these variables
-# if was just x^2, it would include these variables and ALL interactions up to X
-y.quad <- (.2*x1) + (1.5*x3) + rnorm(1000,1,.8)
-y.cubic <- (.2*x1) + (.5*x3) + (4*x4) + rnorm(1000,1,.8)
+# Generate independent variables
+x1 <- rnorm(1000, mean = 1, sd = 1)  # Normal distribution, mean = 1, sd = 1
+x2 <- rnorm(1000, mean = 1, sd = 1)  # Another independent variable
+x3 <- I(x1^2)                        # Quadratic transformation of x1
+x4 <- I(x1^3)                        # Cubic transformation of x1
 
-dat <- data.frame(x1,x2,x3,x4,y.quad,y.cubic)
+# Create dependent variables with polynomial relationships and noise
+y.quad <- (.2 * x1) + (1.5 * x3) + rnorm(1000, mean = 1, sd = 0.8)  # Quadratic relationship
+y.cubic <- (.2 * x1) + (.5 * x3) + (4 * x4) + rnorm(1000, mean = 1, sd = 0.8)  # Cubic relationship
 
-#dat <- read.csv("data.csv", header=T)
-#dat <- readxl::read_xlsx("fake.data.xlsx")
+# Combine all variables into a data frame
+dat <- data.frame(x1, x2, x3, x4, y.quad, y.cubic)
 
+# Uncomment to load data from external sources
+# dat <- read.csv("data.csv", header = TRUE)
+# dat <- readxl::read_xlsx("fake.data.xlsx")
 
 #===========================================
 # Overview                                 #
-#==========================================-
+#===========================================
+# This section discusses the analysis of non-linear relationships using polynomial regression.
+# Polynomial relationships can be modeled by adding polynomial terms of independent variables.
+# This code demonstrates how to identify and analyze both quadratic and cubic relationships.
 
-# If the relationship between an X and Y is not linear, then there may exist a polynomial relationship
-# Here, I refer to quadratic and cubic relationships
-# To analyze these relationships in OLS regression, we simply add a link function
-# Really, all we do is model both a linear form and a polynomial form of the independent variable
-# This code covers how to conduct such an analysis
-# Note that further details on interpreting the model, refer to linear regression 
-
+# To learn more about linear regression interpretation, refer to relevant literature.
 
 #===========================================
-# Assess Descriptives                      #
-#==========================================-
+# Assess Descriptive Statistics             #
+#===========================================
+# Obtain descriptive statistics for the dependent variables
+psych::describe(dat$y.quad)  # Descriptive stats for quadratic dependent variable
+psych::describe(dat$y.cubic)  # Descriptive stats for cubic dependent variable
 
-# Mean, SD, Median, Min, Max, Skewness, and Kurtosis for y
-psych::describe(dat$y.quad)
-psych::describe(dat$y.cubic)
-# Check for no extreme skewness or kurtosis, if so, may have to perform other analyses
-
-# Visualizations for distributions
-hist(dat$y.quad)
-ggdensity(dat$y.quad)
-boxplot(dat$y.quad)
-ggqqplot(dat$y.quad)
+# Visualizations for understanding the distributions
+hist(dat$y.quad, main = "Histogram of y.quad", xlab = "y.quad")  # Histogram for y.quad
+ggdensity(dat$y.quad, main = "Density Plot of y.quad")  # Density plot for y.quad
+boxplot(dat$y.quad, main = "Boxplot of y.quad")  # Boxplot for y.quad
+ggqqplot(dat$y.quad, main = "QQ Plot of y.quad")  # QQ plot for y.quad to check normality
 
 # Preliminary Exploration of Associations
-pairs.panels(dat, scale=TRUE)
-# Can see that x1 has a quadratic with y.quad
-# can also see x1 has cubic with y.cubic
+pairs.panels(dat, scale = TRUE)
+# The pairs.panels function visually represents relationships between variables.
+# Observe that x1 shows a quadratic relationship with y.quad and cubic with y.cubic.
 
 # Assess Multivariate Outliers
-psych::outlier(dat)
+psych::outlier(dat)  # Identify potential outliers in the dataset
 
-# Scatter plot of two variables
-# but if we look at relationship as linear, not a good fit
-ggplot(dat,aes(x1,y.quad)) +
-  geom_point() + 
-  geom_smooth(method="lm")
+# Scatter plot to visualize the relationship between x1 and y.quad
+# A linear fit may not adequately describe the relationship.
+ggplot(dat, aes(x1, y.quad)) +
+  geom_point(color = "darkblue") + 
+  geom_smooth(method = "lm", color = "red", size = 1) +
+  ggtitle("Scatter plot of y.quad vs. x1") +
+  xlab("x1") + 
+  ylab("y.quad") 
 
 #=================================================================
-# Build models and test if Polynomial is needed                  #
-#================================================================-
-Reg.quad.notfit <- lm(y.quad ~ x1 + x2, data=dat)
-Reg.quad.fit <- lm(y.quad ~ x1 + x2 + x3, data=dat)
+# Build Models and Test for Polynomial Relationships             #
+#=================================================================
+# Fit linear regression models to assess if polynomial terms improve the model.
 
-Reg.cubic.notfit <- lm(y.cubic ~ x1 + x2, data=dat)
-Reg.cubic.partialfit <- lm(y.cubic ~ x1 + x2 + x3, data=dat)
-Reg.cubic.fit <- lm(y.cubic ~ x1 + x2 + x3 + x4, data=dat)
+# Fit a linear model without polynomial terms
+Reg.quad.notfit <- lm(y.quad ~ x1 + x2, data = dat)
 
-# Can compare model estimates with and without quadratic 
-jtools::summ(Reg.quad.notfit, digits=3)
-jtools::summ(Reg.quad.fit, digits=3)
-# see overall model improvement when include the quadratic variable
+# Fit a linear model with quadratic term
+Reg.quad.fit <- lm(y.quad ~ x1 + x2 + x3, data = dat)
 
-# Can plot differences with and without quadratic
-plot(Reg.quad.notfit,1)
-plot(Reg.quad.fit,1)
-# See that when not fitted with polynomial, that fit is not good
+# Fit models for cubic relationship
+Reg.cubic.notfit <- lm(y.cubic ~ x1 + x2, data = dat)
+Reg.cubic.partialfit <- lm(y.cubic ~ x1 + x2 + x3, data = dat)  # Quadratic term only
+Reg.cubic.fit <- lm(y.cubic ~ x1 + x2 + x3 + x4, data = dat)  # Full cubic model
 
-# Can formally test if including polynomial improves model fit
-anova(Reg.quad.notfit,Reg.quad.fit)
-# See that fit is MUCH better with polynomial included
-# Have justification for modeling with the polynomial
+# Compare models to assess the effect of including polynomial terms
+jtools::summ(Reg.quad.notfit, digits = 3)  # Summary of the non-fitted quadratic model
+jtools::summ(Reg.quad.fit, digits = 3)      # Summary of the fitted quadratic model
 
-# Can evaluate similar relationship with CUBIC 
+# Assess model performance visually
+plot(Reg.quad.notfit, which = 1)  # Residuals vs Fitted plot for non-fitted model
+plot(Reg.quad.fit, which = 1)      # Residuals vs Fitted plot for fitted model
 
-jtools::summ(Reg.cubic.notfit, digits=3)
-jtools::summ(Reg.cubic.partialfit, digits=3)
-jtools::summ(Reg.cubic.fit, digits=3)
-plot(Reg.cubic.notfit,1)
-plot(Reg.cubic.partialfit,1)
-plot(Reg.cubic.fit,1)
+# Perform ANOVA to formally test if polynomial terms improve model fit
+anova(Reg.quad.notfit, Reg.quad.fit)  # Compare models to evaluate fit improvement
 
-anova(Reg.cubic.notfit,Reg.cubic.partialfit)
-anova(Reg.cubic.partialfit,Reg.cubic.fit)
-# can see the partial fit is better than no cubic
-# also see full cubic is better than partial
-# all point to needing to model quadratic relationship 
+# Evaluate cubic relationships similarly
+jtools::summ(Reg.cubic.notfit, digits = 3)  
+jtools::summ(Reg.cubic.partialfit, digits = 3)
+jtools::summ(Reg.cubic.fit, digits = 3)
 
-# If evidence supports including a polynomial, simply include this variable
-# Then perform linear regression as normal
+# Visualize residuals for cubic models
+plot(Reg.cubic.notfit, which = 1)
+plot(Reg.cubic.partialfit, which = 1)
+plot(Reg.cubic.fit, which = 1)
 
-# can create quadratic and cubic in data sets like
-# dat$x1.2 <- dat$x1^2
+# Conduct ANOVA for cubic models
+anova(Reg.cubic.notfit, Reg.cubic.partialfit)
+anova(Reg.cubic.partialfit, Reg.cubic.fit)
 
+# Summarize findings
+# If model fit improves significantly with polynomial terms, include them in your analysis.
+
+# To create new variables directly in the dataset for further modeling:
+# dat$x1.2 <- dat$x1^2  # Create squared term
+# dat$x1.3 <- dat$x1^3  # Create cubed term
 
 #===========================================
-# Plotting                                 #
-#==========================================-
+# Plotting Results                        #
+#===========================================
+# Set ggplot theme for consistency in plots
+theme_set(theme_bw())
 
-theme_set(
-  theme_bw()
-)
-
-x1.y <- ggplot(dat,aes(x1,y.quad)) +
-  geom_point(color="darkblue") + 
-  geom_smooth(method="gam",color="blue",size=1) + 
-  ggtitle("Y by x1") + theme(plot.title = element_text(hjust = 0.5)) + 
+# Visualize the relationship between x1 and y.quad using fitted values
+x1.y <- ggplot(dat, aes(x1, y.quad)) +
+  geom_point(color = "darkblue") + 
+  geom_smooth(method = "gam", color = "blue", size = 1) + 
+  ggtitle("y.quad vs. x1 with Fitted Curve") + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
   xlab("x1 variable") + 
-  ylab("y variable")
+  ylab("y.quad variable")
 
-x1.y
+print(x1.y)  # Display the plot
 
+# Plot predicted values for quadratic and cubic relationships
+dat$pred.val.quad <- predict(Reg.quad.fit)  # Predicted values for quadratic model
+dat$pred.val.cub <- predict(Reg.cubic.fit)  # Predicted values for cubic model
 
-# Can plot fitted values as well
-# Measure of accuracy
-dat$pred.val.quad <- predict(Reg.quad.fit)
-dat$pred.val.cub <- predict(Reg.cubic.fit)
+# Visualization for predicted vs actual values for quadratic model
+ggplot(dat, aes(pred.val.quad, y.quad)) +
+  geom_point(color = "darkblue") + 
+  geom_smooth(method = "lm", color = "blue", size = 1) + 
+  ggtitle("Quadratic Model: Predicted vs Actual") + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  xlab("Predicted Values") + 
+  ylab("Actual y.quad")
 
-ggplot(dat,aes(pred.val.quad,y.quad)) +
-  geom_point(color="darkblue") + 
-  geom_smooth(method="lm",color="blue",size=1) + 
-  ggtitle("Quadratic Pred") + theme(plot.title = element_text(hjust = 0.5)) + 
-  xlab("Predicted") + 
-  ylab("Actual")
+# Visualization for predicted vs actual values for cubic model
+ggplot(dat, aes(pred.val.cub, y.cubic)) +
+  geom_point(color = "darkblue") + 
+  geom_smooth(method = "lm", color = "blue", size = 1) + 
+  ggtitle("Cubic Model: Predicted vs Actual") + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  xlab("Predicted Values") + 
+  ylab("Actual y.cubic")
 
-ggplot(dat,aes(pred.val.cub,y.cubic)) +
-  geom_point(color="darkblue") + 
-  geom_smooth(method="lm",color="blue",size=1) + 
-  ggtitle("Cubic Pred") + theme(plot.title = element_text(hjust = 0.5)) + 
-  xlab("Predicted") + 
-  ylab("Actual")
+#===========================================
+# End of Analysis                        #
+#===========================================
+# This repository serves as a template for performing polynomial regression analysis.
+# Future analysis may consider implementing validation techniques or exploring additional non-linear relationships.
