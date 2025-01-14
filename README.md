@@ -3,7 +3,7 @@
 This repository provides a collection of R code templates designed to streamline a variety of statistical, machine learning, and spatial analyses. The templates are categorized into sections for easy navigation and include detailed comments, best practices, and visualization techniques.
 
 ## Table of Contents
-1. [Data Quality and Introduction to R]()  
+1. [Data Quality and Introduction to R](1. Data Quality, Exploration, & Intro to R)  
 2. [Linear Regression](#2-linear-regression)  
 3. [Non-Linear Regression](#3-non-linear-regression)  
 4. [Clustering Techniques](#4-clustering-techniques)  
